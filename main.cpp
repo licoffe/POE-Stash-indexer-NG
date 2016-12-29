@@ -1430,59 +1430,62 @@ int main( int argc, char* argv[]) {
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     // Connect to DB
-    driver = sql::mysql::get_mysql_driver_instance();
-    download_con = driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
-    download_con->setSchema( DB_NAME );
-    processing_con = driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
-    processing_con->setSchema( DB_NAME );
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    float time_DB = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-    std::cout << stamp( __FUNCTION__ ) << "Connected to DB in " 
-              << time_DB << " sec" << std::endl;
-              
+    try {
+        driver = sql::mysql::get_mysql_driver_instance();
+        download_con = driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
+        download_con->setSchema( DB_NAME );
+        processing_con = driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
+        processing_con->setSchema( DB_NAME );
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        float time_DB = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
+        std::cout << stamp( __FUNCTION__ ) << "Connected to DB in " 
+                << time_DB << " sec" << std::endl;         
 
-    // Catch interrupt signal
-    struct sigaction sig_int_handler;
+        // Catch interrupt signal
+        struct sigaction sig_int_handler;
 
-    sig_int_handler.sa_handler = cleanup;
-    sigemptyset( &sig_int_handler.sa_mask );
-    sig_int_handler.sa_flags = 0;
-    sigaction( SIGINT, &sig_int_handler, NULL );
+        sig_int_handler.sa_handler = cleanup;
+        sigemptyset( &sig_int_handler.sa_mask );
+        sig_int_handler.sa_flags = 0;
+        sigaction( SIGINT, &sig_int_handler, NULL );
 
-    // init next change id
-    std::cout << stamp( __FUNCTION__ ) << "Checking last downloaded chunk" << std::endl;
-    next_change_id = last_downloaded_chunk();
-    if ( next_change_id.compare( "" ) != 0 ) {
-        if ( next_change_id.compare( "-1" ) == 0 ) {
-            std::cout << stamp( __FUNCTION__ ) << "New indexation: " 
-                      << std::endl;
+        // init next change id
+        std::cout << stamp( __FUNCTION__ ) << "Checking last downloaded chunk" << std::endl;
+        next_change_id = last_downloaded_chunk();
+        if ( next_change_id.compare( "" ) != 0 ) {
+            if ( next_change_id.compare( "-1" ) == 0 ) {
+                std::cout << stamp( __FUNCTION__ ) << "New indexation: " 
+                        << std::endl;
+            } else {
+                std::cout << stamp( __FUNCTION__ ) << "Next change id: " 
+                        << next_change_id << std::endl;
+                std::cout << stamp( __FUNCTION__ ) 
+                        << downloaded_files.size() << " files to be processed" 
+                        << std::endl;
+            }
+            // Start the JSON download loop in a thread
+            download_thread = std::thread( download_loop );
+            // Start the processing loop in a thread
+            processing_thread = std::thread( processing_loop );
         } else {
-            std::cout << stamp( __FUNCTION__ ) << "Next change id: " 
-                      << next_change_id << std::endl;
             std::cout << stamp( __FUNCTION__ ) 
-                      << downloaded_files.size() << " files to be processed" 
-                      << std::endl;
+                    << "There was an error fetching next change id" << std::endl;
         }
-        // Start the JSON download loop in a thread
-        download_thread = std::thread( download_loop );
-        // Start the processing loop in a thread
-        processing_thread = std::thread( processing_loop );
-    } else {
-        std::cout << stamp( __FUNCTION__ ) 
-                  << "There was an error fetching next change id" << std::endl;
+
+        // Wait for threads to finish
+        download_thread.join();
+        processing_thread.join();
+        
+        // Close connections
+        download_con->close();
+        processing_con->close();
+
+        // Cleanup
+        delete download_con;
+        delete processing_con;
+    } catch ( sql::SQLException &e ) {
+        print_sql_error( e );
     }
-
-    // Wait for threads to finish
-    download_thread.join();
-    processing_thread.join();
-    
-    // Close connections
-    download_con->close();
-    processing_con->close();
-
-    // Cleanup
-    delete download_con;
-    delete processing_con;
 
     return 0;
 }
