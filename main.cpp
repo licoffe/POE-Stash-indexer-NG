@@ -464,13 +464,13 @@ struct::Time format_time( float time_ms ) {
  * @return Nothing
  */
 void threaded_insert( const std::string query ) {
+    sql::mysql::MySQL_Driver *new_driver = sql::mysql::get_mysql_driver_instance();
+    sql::Connection *insert_con;
+    sql::Statement *stmt;
     try {
-        sql::mysql::MySQL_Driver *new_driver = sql::mysql::get_mysql_driver_instance();
         new_driver->threadInit();
-        sql::Connection *insert_con;
         insert_con = new_driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
         insert_con->setSchema( DB_NAME );
-        sql::Statement *stmt;
         stmt = insert_con->createStatement();
         stmt->execute( "SET autocommit = 0" );
         stmt->execute( "SET unique_checks = 0" );
@@ -487,6 +487,11 @@ void threaded_insert( const std::string query ) {
         // If query failed, wait 5 seconds and retry
         std::this_thread::sleep_for(std::chrono::milliseconds( 5000 ));
         std::cout << "Retrying" << std::endl;
+        // Cleanup
+        delete stmt;
+        insert_con->close();
+        delete insert_con;
+        new_driver->threadEnd();
         threaded_insert( query );
     }
 }
@@ -1080,13 +1085,17 @@ void parse_JSON( const std::string path ) {
         begin = std::chrono::steady_clock::now();
         std::ofstream mod_file;
         mod_file.open( DB_DATA_DIR + "/mods.txt" );
-        for ( std::vector<Mod>::iterator it = parsed_mods.begin() ; 
-              it != parsed_mods.end(); ++it ) {
-            mod_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->value3 << "," << it->value4 << "," << it->type << "," << it->mod_key << std::endl;
+        if ( mod_file.is_open()) {
+            for ( std::vector<Mod>::iterator it = parsed_mods.begin() ; 
+                  it != parsed_mods.end(); ++it ) {
+                mod_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->value3 << "," << it->value4 << "," << it->type << "," << it->mod_key << std::endl;
+            }
+            mod_file.close();
+            std::thread t_mods( threaded_insert, "LOAD DATA CONCURRENT INFILE 'mods.txt' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            t_mods.detach();
+        } else {
+            std::cout << stamp( __FUNCTION__ ) << "Could not open file" << std::endl;
         }
-        mod_file.close();
-        std::thread t_mods( threaded_insert, "LOAD DATA CONCURRENT INFILE 'mods.txt' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-        t_mods.detach();
         end = std::chrono::steady_clock::now();
         time_mods += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     
@@ -1094,13 +1103,17 @@ void parse_JSON( const std::string path ) {
         begin = std::chrono::steady_clock::now();
         std::ofstream requirement_file;
         requirement_file.open( DB_DATA_DIR + "/requirements.txt" );
-        for ( std::vector<Requirement>::iterator it = parsed_requirements.begin() ; 
-              it != parsed_requirements.end(); ++it ) {
-            requirement_file << it->item_id << "," << it->name << "," << it->value << "," << it->requirement_key << std::endl;
+        if ( requirement_file.is_open()) {
+            for ( std::vector<Requirement>::iterator it = parsed_requirements.begin() ; 
+                  it != parsed_requirements.end(); ++it ) {
+                requirement_file << it->item_id << "," << it->name << "," << it->value << "," << it->requirement_key << std::endl;
+            }
+            requirement_file.close();
+            std::thread t_requirements( threaded_insert, "LOAD DATA CONCURRENT INFILE 'requirements.txt' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            t_requirements.detach();
+        } else {
+            std::cout << stamp( __FUNCTION__ ) << "Could not open file" << std::endl;
         }
-        requirement_file.close();
-        std::thread t_requirements( threaded_insert, "LOAD DATA CONCURRENT INFILE 'requirements.txt' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-        t_requirements.detach();
         end = std::chrono::steady_clock::now();
         time_requirements += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     
@@ -1108,13 +1121,17 @@ void parse_JSON( const std::string path ) {
         begin = std::chrono::steady_clock::now();
         std::ofstream property_file;
         property_file.open( DB_DATA_DIR + "/properties.txt" );
-        for ( std::vector<Property>::iterator it = parsed_properties.begin() ; 
-              it != parsed_properties.end(); ++it ) {
-            property_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->property_key << std::endl;
+        if ( property_file.is_open()) {
+            for ( std::vector<Property>::iterator it = parsed_properties.begin() ; 
+                  it != parsed_properties.end(); ++it ) {
+                property_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->property_key << std::endl;
+            }
+            property_file.close();
+            std::thread t_properties( threaded_insert, "LOAD DATA CONCURRENT INFILE 'properties.txt' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            t_properties.detach();
+        } else {
+            std::cout << stamp( __FUNCTION__ ) << "Could not open file" << std::endl;
         }
-        property_file.close();
-        std::thread t_properties( threaded_insert, "LOAD DATA CONCURRENT INFILE 'properties.txt' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-        t_properties.detach();
         end = std::chrono::steady_clock::now();
         time_properties += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     
@@ -1122,13 +1139,17 @@ void parse_JSON( const std::string path ) {
         begin = std::chrono::steady_clock::now();
         std::ofstream socket_file;
         socket_file.open(  DB_DATA_DIR + "/sockets.txt" );
-        for ( std::vector<Socket>::iterator it = parsed_sockets.begin() ; 
-              it != parsed_sockets.end(); ++it ) {
-              socket_file << it->item_id << "," << it->group << "," << it->attr << "," << it->socket_key << std::endl;
+        if ( socket_file.is_open()) {
+            for ( std::vector<Socket>::iterator it = parsed_sockets.begin() ; 
+                  it != parsed_sockets.end(); ++it ) {
+                  socket_file << it->item_id << "," << it->group << "," << it->attr << "," << it->socket_key << std::endl;
+            }
+            socket_file.close();
+            std::thread t_sockets( threaded_insert, "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            t_sockets.detach();
+        } else {
+            std::cout << stamp( __FUNCTION__ ) << "Could not open file" << std::endl;
         }
-        socket_file.close();
-        std::thread t_sockets( threaded_insert, "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-        t_sockets.detach();
         end = std::chrono::steady_clock::now();
         time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
 
@@ -1450,8 +1471,15 @@ int main( int argc, char* argv[]) {
         sigaction( SIGINT, &sig_int_handler, NULL );
 
         // init next change id
-        std::cout << stamp( __FUNCTION__ ) << "Checking last downloaded chunk" << std::endl;
-        next_change_id = last_downloaded_chunk();
+        if ( argc > 1 ) {
+            next_change_id = argv[1];
+            std::cout << stamp( __FUNCTION__ ) << "Resuming from input chunk " 
+                      << "(" << next_change_id << ")" << std::endl;
+        } else {
+            std::cout << stamp( __FUNCTION__ ) << "Checking last downloaded chunk" 
+                      << std::endl;
+            next_change_id = last_downloaded_chunk();
+        }
         if ( next_change_id.compare( "" ) != 0 ) {
             if ( next_change_id.compare( "-1" ) == 0 ) {
                 std::cout << stamp( __FUNCTION__ ) << "New indexation: " 

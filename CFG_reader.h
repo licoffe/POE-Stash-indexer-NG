@@ -28,7 +28,7 @@ class CFG_reader {
     private:
         const std::regex COMMENT_RE    = std::regex( "^#.*" );
         const std::regex DEFINITION_RE = 
-            std::regex( "([a-zA-Z_]+)\\s*=\\s*([a-zA-Z0-9_:/.]+)" );
+            std::regex( "([a-zA-Z_]+)\\s*=\\s*([a-zA-Z0-9_:/. ]+)" );
 };
 
 #endif /* _CFG_READER_H_ */
