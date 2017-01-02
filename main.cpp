@@ -255,18 +255,12 @@ std::string download_JSON( const std::string change_id ) {
  * @return Next change ID
  */
 std::string last_downloaded_chunk() {
-    std::vector<std::string> results;
-	
+    std::vector<std::string> results = std::vector<std::string>();
+	sql::Statement *stmt = NULL;
+    sql::ResultSet  *res = NULL;
     try {
-        sql::Statement *stmt;
-        sql::ResultSet  *res;
-
         stmt = download_con->createStatement();
-        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` ORDER BY ID DESC LIMIT 1"  );
-        while ( res->next()) {
-            results.push_back( res->getString( "nextChangeId" ));
-        }
-        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` WHERE `processed` = 0 ORDER BY ID ASC"  );
+        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` WHERE `processed` = 0 ORDER BY ID ASC LIMIT 1"  );
         while ( res->next()) {
             downloaded_files.push_back( res->getString( "nextChangeId" ));
         }
@@ -275,6 +269,8 @@ std::string last_downloaded_chunk() {
         delete stmt;
     } catch ( sql::SQLException &e ) {
         print_sql_error( e );
+        delete res;
+        delete stmt;
         return "";
     }
     if ( results.size() > 0 ) {
