@@ -465,8 +465,8 @@ struct::Time format_time( float time_ms ) {
  */
 void threaded_insert( const std::string query ) {
     sql::mysql::MySQL_Driver *new_driver = sql::mysql::get_mysql_driver_instance();
-    sql::Connection *insert_con;
-    sql::Statement *stmt;
+    sql::Connection *insert_con = NULL;
+    sql::Statement *stmt = NULL;
     try {
         new_driver->threadInit();
         insert_con = new_driver->connect( DB_HOST + ":" + DB_PORT, DB_USER, DB_PASS );
@@ -488,9 +488,13 @@ void threaded_insert( const std::string query ) {
         std::this_thread::sleep_for(std::chrono::milliseconds( 5000 ));
         std::cout << "Retrying" << std::endl;
         // Cleanup
-        delete stmt;
-        insert_con->close();
-        delete insert_con;
+        if ( stmt ) {
+            delete stmt;
+        }
+        if ( insert_con ) {
+            insert_con->close();
+            delete insert_con;
+        }
         new_driver->threadEnd();
         threaded_insert( query );
     }
