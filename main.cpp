@@ -255,12 +255,11 @@ std::string download_JSON( const std::string change_id ) {
  * @return Next change ID
  */
 std::string last_downloaded_chunk() {
-    std::vector<std::string> results = std::vector<std::string>();
 	sql::Statement *stmt = NULL;
     sql::ResultSet  *res = NULL;
     try {
         stmt = download_con->createStatement();
-        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` WHERE `processed` = 0 ORDER BY ID ASC LIMIT 1"  );
+        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` ORDER BY ID ASC LIMIT 1"  );
         while ( res->next()) {
             downloaded_files.push_back( res->getString( "nextChangeId" ));
         }
@@ -273,8 +272,8 @@ std::string last_downloaded_chunk() {
         delete stmt;
         return "";
     }
-    if ( results.size() > 0 ) {
-        return results[0];
+    if ( downloaded_files.size() > 0 ) {
+        return downloaded_files[0];
     } else {
         return "-1";
     }
@@ -853,26 +852,6 @@ void parse_JSON( const std::string path ) {
                                 "\"" + item_id + std::to_string(counter_mods) + "\""
                             };
                             parsed_mods.push_back( parsed_mod );
-                            // Insert mods into database
-                            // try {
-                            //     mod_stmt->setString( 1, item_id );
-                            //     mod_stmt->setString( 2, name );
-                            //     mod_stmt->setString( 3, values[0]);
-                            //     mod_stmt->setString( 4, values[1]);
-                            //     mod_stmt->setString( 5, values[2]);
-                            //     mod_stmt->setString( 6, values[3]);
-                            //     mod_stmt->setString( 7, "CRAFTED" );
-                            //     mod_stmt->setString( 8, item_id + "_" + std::to_string(counter_mods));
-                            //     mod_stmt->setString( 9, name );
-                            //     mod_stmt->setString( 10, values[0]);
-                            //     mod_stmt->setString( 11, values[1]);
-                            //     mod_stmt->setString( 12, values[2]);
-                            //     mod_stmt->setString( 13, values[3]);
-                            //     mod_stmt->setString( 14, "CRAFTED" );
-                            //     mod_stmt->execute();
-                            // } catch ( sql::SQLException &e ) {
-                            //     print_sql_error( e );
-                            // }
                         }
                     }
                 }
