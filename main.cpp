@@ -768,6 +768,7 @@ void parse_JSON( const std::string path ) {
                 /* Parse item mods, properties, requirements and sockets and
                    store them in vectors for delayed insertion. */
 
+                begin = std::chrono::steady_clock::now();
                 // Parse mods
                 int counter_mods = 0;
                 // Regex to extract numerical values
@@ -1042,9 +1043,12 @@ void parse_JSON( const std::string path ) {
                         }
                     }
                 }
+                end = std::chrono::steady_clock::now();
+                time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             }
         }
         // If we already had a stash with the current stash id
+        begin = std::chrono::steady_clock::now();
         if ( old_stash.size() > 0 ) {
             // Get differences between old and enw stash versions
             Stash_differences differences = compare_stashes( old_stash, new_stash );
@@ -1075,9 +1079,14 @@ void parse_JSON( const std::string path ) {
             item_added   -= differences.kept.size();
             item_updated += differences.kept.size();
         }
+        end = std::chrono::steady_clock::now();
+        time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     }
     try {
+        begin = std::chrono::steady_clock::now();
         stmt->execute( "COMMIT" );
+        end = std::chrono::steady_clock::now();
+        time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     } catch ( sql::SQLException &e ) {
         print_sql_error( e );
     }
