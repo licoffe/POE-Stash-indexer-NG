@@ -632,6 +632,8 @@ void parse_JSON( const std::string path ) {
 
         // For each item in the stash
         for ( rapidjson::SizeType j = 0; j < items.Size(); j++ ) {
+            begin = std::chrono::steady_clock::now();
+            
             const rapidjson::Value& item = items[j];
             if ( item.IsObject()) {
                 bool verified              = item["verified"].GetBool();
@@ -713,7 +715,7 @@ void parse_JSON( const std::string path ) {
                                   flavour_text, price, crafted, enchanted };
                 new_stash.push_back( new_item );
 
-                begin = std::chrono::steady_clock::now();
+                
                 // Insert new item
                 try {
                     item_stmt->setInt(    1, w );
