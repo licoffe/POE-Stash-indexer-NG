@@ -531,15 +531,19 @@ void parse_JSON( const std::string path ) {
     time_sockets      = 0.0;
     time_item         = 0.0;
     time_other        = 0.0;
+    std::stringstream msg;
 
     // Read the content of the JSON file
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     if ( !std::ifstream( path )) {
-        std::cout << stamp( __FUNCTION__ ) << "File does not exist, skipping: " 
-                  << path << std::endl;
+        msg << stamp( __FUNCTION__ ) << "File does not exist, skipping: " << path;
+        std::cout << msg.str() << std::endl;
+        msg.str( "" );
         return;
     }
-    std::cout << stamp( __FUNCTION__ ) << "Reading data file: " << path << std::endl;
+    msg << stamp( __FUNCTION__ ) << "Reading data file: " << path;
+    std::cout << msg.str() << std::endl;
+    msg.str( "" );
     std::ifstream file( path.c_str() );
     std::stringstream sstr;
     sstr << file.rdbuf();
@@ -547,8 +551,10 @@ void parse_JSON( const std::string path ) {
     document.Parse( sstr.str().c_str());
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     time_loading_JSON = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-    std::cout << stamp( __FUNCTION__ ) << "Loaded: " << path << " in " 
-              << time_loading_JSON << " sec" << std::endl;
+    msg << stamp( __FUNCTION__ ) << "Loaded: " << path << " in " 
+        << time_loading_JSON << " sec";
+    std::cout << msg.str() << std::endl;
+    msg.str( "" );
     // MySQL statements used for insertions
     sql::Statement           *stmt = processing_con->createStatement();
     sql::PreparedStatement   *account_stmt = processing_con->prepareStatement( "INSERT INTO `Accounts` (`accountName`, `lastCharacterName`, `lastSeen`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `lastSeen` = ?, `lastCharacterName` = ?" );
@@ -1086,11 +1092,13 @@ void parse_JSON( const std::string path ) {
         property_queue.push_front( parsed_properties );
         socket_queue.push_front( parsed_sockets );
 
-        std::cout << stamp( __FUNCTION__ ) 
-                  << "Next batch > mods: " << parsed_mods.size() 
-                  << ", properties: " << parsed_properties.size() 
-                  << ", requirements: " << parsed_requirements.size() 
-                  << ", sockets: " << parsed_sockets.size() << std::endl;
+        msg << stamp( __FUNCTION__ ) 
+            << "Next batch > mods: " << parsed_mods.size() 
+            << ", properties: " << parsed_properties.size() 
+            << ", requirements: " << parsed_requirements.size() 
+            << ", sockets: " << parsed_sockets.size();
+        std::cout << msg.str() << std::endl;
+        msg.str( "" );
         // Empty arrays
         parsed_mods.clear();
         parsed_requirements.clear();
@@ -1186,7 +1194,7 @@ void mod_loop() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
     }
-    std::cout << "Exiting mod_loop" << std::endl;
+    // std::cout << "Exiting mod_loop" << std::endl;
 }
 
 /**
@@ -1214,8 +1222,8 @@ void requirement_loop() {
                 std::ofstream requirement_file;
                 requirement_file.open( DB_DATA_DIR + "/requirements.txt" );
                 if ( requirement_file.is_open()) {
-                    for ( std::vector<Requirement>::iterator it = parsed_requirements.begin() ; 
-                        it != parsed_requirements.end(); ++it ) {
+                    for ( std::vector<Requirement>::iterator it = requirements.begin() ; 
+                        it != requirements.end(); ++it ) {
                         requirement_file << it->item_id << "," << it->name << "," << it->value << "," << it->requirement_key << std::endl;
                     }
                     requirement_file.close();
@@ -1240,7 +1248,7 @@ void requirement_loop() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
     }
-    std::cout << "Exiting requirement_loop" << std::endl;
+    // std::cout << "Exiting requirement_loop" << std::endl;
 }
 
 /**
@@ -1294,7 +1302,7 @@ void property_loop() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
     }
-    std::cout << "Exiting property_loop" << std::endl;
+    // std::cout << "Exiting property_loop" << std::endl;
 }
 
 /**
@@ -1306,11 +1314,15 @@ void property_loop() {
  * @return Nothing
  */
 void socket_loop() {
+    bool printed_wait = false;
+    std::stringstream msg;
     while ( !interrupt ) {
         while ( socket_queue.size() > 0 ) {
             if ( !inserting_sockets ) {
-                std::cout << stamp( __FUNCTION__ ) << "Inserting socket batch" 
-                          << std::endl;
+                printed_wait = false;
+                msg << stamp( __FUNCTION__ ) << "Inserting socket batch";
+                std::cout << msg.str() << std::endl;
+                msg.str( "" );
                 std::vector<Socket> sockets = socket_queue.front();
                 inserting_sockets = true;
                 // insert socket batch
@@ -1318,14 +1330,16 @@ void socket_loop() {
                 std::ofstream socket_file;
                 socket_file.open(  DB_DATA_DIR + "/sockets.txt" );
                 if ( socket_file.is_open()) {
-                    for ( std::vector<Socket>::iterator it = parsed_sockets.begin() ; 
-                        it != parsed_sockets.end(); ++it ) {
+                    for ( std::vector<Socket>::iterator it = sockets.begin() ; 
+                        it != sockets.end(); ++it ) {
                         socket_file << it->item_id << "," << it->group << "," << it->attr << "," << it->socket_key << std::endl;
                     }
                     socket_file.close();
                     threaded_insert( "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
                 } else {
-                    std::cout << stamp( __FUNCTION__ ) << "Could not open file" << std::endl;
+                    msg << stamp( __FUNCTION__ ) << "Could not open file";
+                    std::cout << msg.str() << std::endl;
+                    msg.str( "" );
                 }
                 std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
                 time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
@@ -1333,6 +1347,14 @@ void socket_loop() {
                 socket_queue.pop_back();
             }
         }
+        // If we are out of entries to insert
+        if ( !interrupt && !printed_wait ) {
+            msg << stamp( __FUNCTION__ ) << "Waiting for socket to insert";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
+            printed_wait = true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
         // std::cout << stamp( __FUNCTION__ ) << "Waiting for socket batches" << std::endl;
     }
 }
@@ -1345,6 +1367,7 @@ void socket_loop() {
  */
 void download_loop() {
     rapidjson::Document document;
+    std::stringstream msg;
 
     while ( !interrupt ) {
         // If we can download some more files ahead
@@ -1362,8 +1385,10 @@ void download_loop() {
             document.Parse( sstr.str().c_str());
             // If document is not valid, do not change the change id
             if ( !document.IsObject() || document["next_change_id"].IsNull()) {
-                std::cout << stamp( __FUNCTION__ ) << "Change ID " 
-                          << next_change_id << " empty" << std::endl;
+                msg << stamp( __FUNCTION__ ) << "Change ID " 
+                    << next_change_id << " empty";
+                std::cout << msg.str() << std::endl;
+                msg.str( "" );
                 continue;
             }
             const rapidjson::Value& change_id = document["next_change_id"];
@@ -1383,7 +1408,7 @@ void download_loop() {
             std::this_thread::sleep_for(std::chrono::milliseconds( 1000 ));
         }
     }
-    std::cout << "Exiting download_loop" << std::endl;
+    // std::cout << "Exiting download_loop" << std::endl;
 }
 
 /**
@@ -1478,13 +1503,14 @@ void processing_loop() {
         }
         // If we are out of files to parse
         if ( !interrupt && !printed_wait ) {
-            std::cout << stamp( __FUNCTION__ ) << "Waiting for files to process" 
-                      << std::endl;
+            msg << stamp( __FUNCTION__ ) << "Waiting for files to process";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
             printed_wait = true;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
     }
-    std::cout << "Exiting processing_loop" << std::endl;
+    // std::cout << "Exiting processing_loop" << std::endl;
 }
 
 /**
@@ -1508,7 +1534,7 @@ void cleanup( const int s ) {
     if ( mod_queue_size > 0 ) {
         msg << stamp( __FUNCTION__ ) << RED 
                   << "Waiting for " << mod_queue_size 
-                  << " mod batches to finish insertion" 
+                  << " mod batch(es) to end program" 
                   << RESET;
         std::cout << msg.str() << std::endl;
         msg.str( "" );
@@ -1516,7 +1542,7 @@ void cleanup( const int s ) {
     if ( property_queue_size > 0 ) {
         msg << stamp( __FUNCTION__ ) << RED 
                   << "Waiting for " << property_queue_size 
-                  << " property batches to finish insertion" 
+                  << " property batch(es) to end program"
                   << RESET;
         std::cout << msg.str() << std::endl;
         msg.str( "" );
@@ -1524,7 +1550,7 @@ void cleanup( const int s ) {
     if ( requirement_queue_size > 0 ) {
         msg << stamp( __FUNCTION__ ) << RED 
                   << "Waiting for " << requirement_queue_size 
-                  << " requirement batches to finish insertion" 
+                  << " requirement batch(es) to end program"
                   << RESET;
         std::cout << msg.str() << std::endl;
         msg.str( "" );
@@ -1532,7 +1558,7 @@ void cleanup( const int s ) {
     if ( socket_queue_size > 0 ) {
         msg << stamp( __FUNCTION__ ) << RED 
             << "Waiting for " << socket_queue_size 
-            << " socket batches to finish insertion" 
+            << " socket batch(es) to end program"
             << RESET;
         std::cout << msg.str() << std::endl;
         msg.str( "" );
@@ -1638,6 +1664,10 @@ int main( int argc, char* argv[]) {
     std::thread property_insert_thread;    // Property insertion loop thread
     std::thread socket_insert_thread;      // Socket insertion loop thread
 
+    /* Concat printed string prior std::cout as text may get scrambled in 
+       multithreaded environment */
+    std::stringstream msg;
+
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     // Connect to DB
     try {
@@ -1648,8 +1678,10 @@ int main( int argc, char* argv[]) {
         processing_con->setSchema( DB_NAME );
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         float time_DB = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-        std::cout << stamp( __FUNCTION__ ) << "Connected to DB in " 
-                << time_DB << " sec" << std::endl;         
+        msg << stamp( __FUNCTION__ ) << "Connected to DB in " 
+            << time_DB << " sec";
+        std::cout << msg.str() << std::endl;
+        msg.str( "" );
 
         // Catch interrupt signal
         struct sigaction sig_int_handler;
@@ -1662,37 +1694,45 @@ int main( int argc, char* argv[]) {
         // init next change id
         if ( argc > 1 ) {
             next_change_id = argv[1];
-            std::cout << stamp( __FUNCTION__ ) << "Resuming from input chunk " 
-                      << "(" << next_change_id << ")" << std::endl;
+            msg << stamp( __FUNCTION__ ) << "Resuming from input chunk " 
+                << "(" << next_change_id << ")";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
         } else {
-            std::cout << stamp( __FUNCTION__ ) << "Checking last downloaded chunk" 
-                      << std::endl;
+            msg << stamp( __FUNCTION__ ) << "Checking last downloaded chunk";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
             next_change_id = last_downloaded_chunk();
         }
         if ( next_change_id.compare( "" ) != 0 ) {
             if ( next_change_id.compare( "-1" ) == 0 ) {
-                std::cout << stamp( __FUNCTION__ ) << "New indexation: " 
-                        << std::endl;
+                msg << stamp( __FUNCTION__ ) << "New indexation: ";
+                std::cout << msg.str() << std::endl;
+                msg.str( "" );
             } else {
-                std::cout << stamp( __FUNCTION__ ) << "Next change id: " 
-                        << next_change_id << std::endl;
-                std::cout << stamp( __FUNCTION__ ) 
-                        << downloaded_files.size() << " files to be processed" 
-                        << std::endl;
+                msg << stamp( __FUNCTION__ ) << "Next change id: " 
+                    << next_change_id;
+                std::cout << msg.str() << std::endl;
+                msg.str( "" );
+                msg << stamp( __FUNCTION__ ) 
+                    << downloaded_files.size() << " files to be processed";
+                std::cout << msg.str() << std::endl;
+                msg.str( "" );
             }
             // Start insertion threads
             mod_insert_thread         = std::thread( mod_loop );
             requirement_insert_thread = std::thread( requirement_loop );
             property_insert_thread    = std::thread( property_loop );
-            // socket_insert_thread      = std::thread( socket_loop );
+            socket_insert_thread      = std::thread( socket_loop );
             // Start the JSON download loop in a thread
             download_thread   = std::thread( download_loop );
             // Start the processing loop in a thread
             processing_thread = std::thread( processing_loop );
         } else {
-            std::cout << stamp( __FUNCTION__ ) 
-                      << "There was an error fetching next change id" 
-                      << std::endl;
+            msg << stamp( __FUNCTION__ ) 
+                << "There was an error fetching next change id";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
         }
 
         // Wait for threads to finish
@@ -1701,7 +1741,7 @@ int main( int argc, char* argv[]) {
         mod_insert_thread.join();
         requirement_insert_thread.join();
         property_insert_thread.join();
-        // socket_insert_thread.join();
+        socket_insert_thread.join();
         
         // Close connections
         download_con->close();
