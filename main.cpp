@@ -1158,7 +1158,8 @@ void mod_loop() {
         while ( mod_queue.size() > 0 ) {
             printed_wait = false;
             if ( !inserting_mods ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting mod batch";
+                msg << stamp( __FUNCTION__ ) << "Inserting mod batch (" 
+                    << mod_queue.size() << " to go)";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
                 std::vector<Mod> mods = mod_queue.front();
@@ -1212,7 +1213,8 @@ void requirement_loop() {
         while ( requirement_queue.size() > 0 ) {
             printed_wait = false;
             if ( !inserting_requirements ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting requirement batch";
+                msg << stamp( __FUNCTION__ ) << "Inserting requirement batch (" 
+                    << requirement_queue.size() << " to go)";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
                 std::vector<Requirement> requirements = requirement_queue.front();
@@ -1266,7 +1268,8 @@ void property_loop() {
         while ( property_queue.size() > 0 ) {
             printed_wait = false;
             if ( !inserting_properties ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting property batch";
+                msg << stamp( __FUNCTION__ ) << "Inserting property batch (" 
+                    << property_queue.size() << " to go)";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
                 std::vector<Property> properties = property_queue.front();
@@ -1320,7 +1323,8 @@ void socket_loop() {
         while ( socket_queue.size() > 0 ) {
             if ( !inserting_sockets ) {
                 printed_wait = false;
-                msg << stamp( __FUNCTION__ ) << "Inserting socket batch";
+                msg << stamp( __FUNCTION__ ) << "Inserting socket batch (" 
+                    << socket_queue.size() << " to go)";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
                 std::vector<Socket> sockets = socket_queue.front();
