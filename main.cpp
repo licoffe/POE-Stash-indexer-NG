@@ -1457,8 +1457,7 @@ void processing_loop() {
             float speed         = std::floor( sum / time_sec );
             float total_speed   = std::floor( total_sum / total_time );
             float remaning_time = 
-                time_sec - ( time_loading_JSON + time_item + time_mods + 
-                time_properties + time_sockets + time_requirements + time_other );
+                time_sec - ( time_loading_JSON + time_item + time_other );
             Time total_time_conv = format_time( total_time * 1000.0 );
             Time time_sec_conv   = format_time( time_sec * 1000.0 );
             msg << stamp( __FUNCTION__ ) << "Entries total: " 
@@ -1475,14 +1474,6 @@ void processing_loop() {
                 << "JSON: " << round( time_loading_JSON, 2 ) << " sec, "
                 << "items: " << round( time_item, 2 ) << " sec (" 
                 << std::ceil( time_item * 100 / time_sec ) << " %), "
-                << "mods: " << round( time_mods, 2 ) << " sec (" 
-                << std::ceil( time_mods * 100 / time_sec ) << " %), "
-                << "props: " << round( time_properties, 2 ) << " sec (" 
-                << std::ceil( time_properties * 100 / time_sec ) << " %), "
-                << "socks: " << round( time_sockets, 2 ) << " sec (" 
-                << std::ceil( time_sockets * 100 / time_sec ) << " %), "
-                << "req: " << round( time_requirements, 2 ) << " sec (" 
-                << std::ceil( time_requirements * 100 / time_sec ) << " %) "
                 << "others: " << round( time_other, 2 ) << " sec ("
                 << std::ceil( time_other * 100 / time_sec ) << " %), "
                 << "remain: " << round( remaning_time, 2 ) << " sec ("
