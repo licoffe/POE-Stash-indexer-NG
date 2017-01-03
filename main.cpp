@@ -556,6 +556,7 @@ void parse_JSON( const std::string path ) {
     std::cout << msg.str() << std::endl;
     msg.str( "" );
     // MySQL statements used for insertions
+    begin = std::chrono::steady_clock::now();
     sql::Statement           *stmt = processing_con->createStatement();
     sql::PreparedStatement   *account_stmt = processing_con->prepareStatement( "INSERT INTO `Accounts` (`accountName`, `lastCharacterName`, `lastSeen`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `lastSeen` = ?, `lastCharacterName` = ?" );
     sql::PreparedStatement   *stash_stmt = processing_con->prepareStatement( "INSERT INTO `Stashes` (`stashId`, `stashName`, `stashType`, `publicStash`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `stashName` = ?, `stashType` = ?, `publicStash` = ?" ); 
@@ -563,7 +564,8 @@ void parse_JSON( const std::string path ) {
     sql::PreparedStatement   *item_stmt = processing_con->prepareStatement( "INSERT INTO `Items` (`w`, `h`, `ilvl`, `icon`, `league`, `itemId`, `name`, `typeLine`, `identified`, `verified`, `crafted`, `enchanted`, `corrupted`, `lockedToCharacter`, `frameType`, `x`, `y`, `inventoryId`, `accountName`, `stashId`, `socketAmount`, `linkAmount`, `available`, `addedTs`, `updatedTs`, `flavourText`, `price`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1', ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `name` = ?, `verified` = ?, `crafted` = ?, `enchanted` = ?, `corrupted` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = '1', `updatedTs` = ?, `price` = ?" );
     sql::PreparedStatement   *remove_item_stmt = processing_con->prepareStatement(
         "UPDATE `Items` SET `ilvl` = ?, `icon` = ?, `league` = ?, `name` = ?, `typeLine` = ?, `identified` = ?, `verified` = ?, `corrupted` = ?, `lockedToCharacter` = ?, `frameType` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = 0, `updatedTs` = ? WHERE `itemId` = ?" );
-
+    end = std::chrono::steady_clock::now();
+    time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     try {
         stmt->execute( "START TRANSACTION" );
     } catch ( sql::SQLException &e ) {
@@ -623,12 +625,12 @@ void parse_JSON( const std::string path ) {
             print_sql_error( e );
         }
 
-        end = std::chrono::steady_clock::now();
-        time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-
         // Get previously stored stash contents
         std::vector<Item> old_stash = get_stash_by_ID( stash_id );
         std::vector<Item> new_stash = std::vector<Item>();
+
+        end = std::chrono::steady_clock::now();
+        time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
 
         // For each item in the stash
         for ( rapidjson::SizeType j = 0; j < items.Size(); j++ ) {
@@ -1094,6 +1096,7 @@ void parse_JSON( const std::string path ) {
     }
     parsed_files++;
 
+    begin = std::chrono::steady_clock::now();
     /* If we parsed enough files, add the values to the insertion queues */
     if ( parsed_files == FLUSH_SIZE ) {
         parsed_files = 0;
@@ -1116,6 +1119,8 @@ void parse_JSON( const std::string path ) {
         parsed_properties.clear();
         parsed_sockets.clear();
     }
+    end = std::chrono::steady_clock::now();
+    time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
 
     delete stmt;
     delete account_stmt;
