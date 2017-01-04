@@ -139,8 +139,9 @@ const std::string DB_DATA_DIR = reader.get( "DB_DATA_DIR" );
 // How many files should be downloaded ahead
 const int DOWNLOAD_AHEAD_SIZE = 10;
 // How many files to parse before sending to DB
-const int FLUSH_SIZE          = 10;
-const bool LOG_STAT           = true;
+const int  FLUSH_SIZE         = 10;
+const bool LOG_STAT           = true;  // Log statistics about insertions
+const int  THROTTLE_DELAY     = 2;     // How long to wait if API throttled
 bool interrupt                = false; // Set to true on ctr + C, exit threads
 /* Set to true by processing loop after flushing parsed item properties to queues */
 bool end_program              = false;
@@ -166,6 +167,7 @@ sql::mysql::MySQL_Driver      *driver;
 sql::Connection               *download_con;
 sql::Connection               *processing_con;
 std::mutex                    queue_mutex;
+std::mutex                    cout_mutex;
 int parsed_files              = 0;
 // Queues for delayed mod, requirement, property and socket insertion
 std::deque<std::vector<Mod>>         mod_queue         = std::deque<std::vector<Mod>>();
@@ -213,7 +215,9 @@ void print_sql_error( const sql::SQLException e ) {
         << __LINE__ << std::endl << "# ERR: " << e.what()
         << std::endl << " (MySQL error code: " << e.getErrorCode()
         << std::endl << ", SQLState: " << e.getSQLState() << " )";
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
 }
 
 /**
@@ -249,22 +253,28 @@ std::string download_JSON( const std::string change_id ) {
         /* always cleanup */
         curl_easy_cleanup( curl );
         fclose( fp );
+
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        msg << stamp( __FUNCTION__ ) << "Downloaded " << change_id 
+            << " (" << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0
+            << "sec )";
+        cout_mutex.lock();
+        std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
+        msg.str( "" );
+
         if ( res != CURLE_OK ) {
             msg << stamp( __FUNCTION__ ) << "There was an error downloading " 
                 << change_id << ": " << curl_easy_strerror( res )
                 << ", retrying";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             download_JSON( change_id );
         } else {
             return path;
         }
-        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        msg << stamp( __FUNCTION__ ) << "Downloaded " << change_id 
-            << " (" << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0
-            << "sec )";
-        std::cout << msg.str() << std::endl;
-        msg.str( "" );
     }
     return "";
 }
@@ -502,12 +512,16 @@ void threaded_insert( const std::string query ) {
     } catch ( sql::SQLException &e ) {
         print_sql_error( e );
         msg << query;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
         // If query failed, wait 5 seconds and retry
         std::this_thread::sleep_for(std::chrono::milliseconds( 5000 ));
         msg << "Retrying" << std::endl;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
         // Cleanup
         if ( stmt ) {
@@ -542,12 +556,16 @@ void parse_JSON( const std::string path ) {
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     if ( !std::ifstream( path )) {
         msg << stamp( __FUNCTION__ ) << "File does not exist, skipping: " << path;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
         return;
     }
     msg << stamp( __FUNCTION__ ) << "Reading data file: " << path;
+    cout_mutex.lock();
     std::cout << msg.str() << std::endl;
+    cout_mutex.unlock();
     msg.str( "" );
     std::ifstream file( path.c_str() );
     std::stringstream sstr;
@@ -558,7 +576,9 @@ void parse_JSON( const std::string path ) {
     time_loading_JSON = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     msg << stamp( __FUNCTION__ ) << "Loaded: " << path << " in " 
         << time_loading_JSON << " sec";
+    cout_mutex.lock();
     std::cout << msg.str() << std::endl;
+    cout_mutex.unlock();
     msg.str( "" );
     // MySQL statements used for insertions
     begin = std::chrono::steady_clock::now();
@@ -1106,17 +1126,19 @@ void parse_JSON( const std::string path ) {
     if ( parsed_files == FLUSH_SIZE ) {
         parsed_files = 0;
 
-        mod_queue.push_front( parsed_mods );
-        requirement_queue.push_front( parsed_requirements );
-        property_queue.push_front( parsed_properties );
-        socket_queue.push_front( parsed_sockets );
+        mod_queue.push_back( parsed_mods );
+        requirement_queue.push_back( parsed_requirements );
+        property_queue.push_back( parsed_properties );
+        socket_queue.push_back( parsed_sockets );
 
         msg << stamp( __FUNCTION__ ) 
             << "Next batch > mods: " << parsed_mods.size() 
             << ", properties: " << parsed_properties.size() 
             << ", requirements: " << parsed_requirements.size() 
             << ", sockets: " << parsed_sockets.size();
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
         // Empty arrays
         parsed_mods.clear();
@@ -1183,7 +1205,9 @@ void mod_loop() {
             printed_wait = false;
             msg << stamp( __FUNCTION__ ) << "Inserting mod batch (" 
                 << mod_queue.size() << " to go)";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             std::vector<Mod> mods = mod_queue.front();
             inserting_mods = true;
@@ -1200,18 +1224,22 @@ void mod_loop() {
                 threaded_insert( "LOAD DATA CONCURRENT INFILE 'mods.txt' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             } else {
                 msg << stamp( __FUNCTION__ ) << "Could not open file";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             }
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_mods += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_mods = false;
-            mod_queue.pop_back();
+            mod_queue.pop_front();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
             msg << stamp( __FUNCTION__ ) << "Waiting for mods to insert";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             printed_wait = true;
         }
@@ -1234,12 +1262,14 @@ void requirement_loop() {
     while ( true ) {
         if ( requirement_queue.size() == 0 && end_program ) {
             return;
-        }   
+        }
         if ( !inserting_requirements && requirement_queue.size() > 0 ) {
             printed_wait = false;
             msg << stamp( __FUNCTION__ ) << "Inserting requirement batch (" 
                 << requirement_queue.size() << " to go)";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             std::vector<Requirement> requirements = requirement_queue.front();
             inserting_requirements = true;
@@ -1256,18 +1286,22 @@ void requirement_loop() {
                 threaded_insert( "LOAD DATA CONCURRENT INFILE 'requirements.txt' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             } else {
                 msg << stamp( __FUNCTION__ ) << "Could not open file";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             }
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_requirements += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_requirements = false;
-            requirement_queue.pop_back();
+            requirement_queue.pop_front();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
             msg << stamp( __FUNCTION__ ) << "Waiting for requirements to insert";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             printed_wait = true;
         }
@@ -1295,7 +1329,9 @@ void property_loop() {
             printed_wait = false;
             msg << stamp( __FUNCTION__ ) << "Inserting property batch (" 
                 << property_queue.size() << " to go)";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             std::vector<Property> properties = property_queue.front();
             inserting_properties = true;
@@ -1312,18 +1348,22 @@ void property_loop() {
                 threaded_insert( "LOAD DATA CONCURRENT INFILE 'properties.txt' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             } else {
                 msg << stamp( __FUNCTION__ ) << "Could not open file";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             }
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_properties += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_properties = false;
-            property_queue.pop_back();
+            property_queue.pop_front();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
             msg << stamp( __FUNCTION__ ) << "Waiting for property to insert";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             printed_wait = true;
         }
@@ -1351,7 +1391,9 @@ void socket_loop() {
             printed_wait = false;
             msg << stamp( __FUNCTION__ ) << "Inserting socket batch (" 
                 << socket_queue.size() << " to go)";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             std::vector<Socket> sockets = socket_queue.front();
             inserting_sockets = true;
@@ -1368,18 +1410,22 @@ void socket_loop() {
                 threaded_insert( "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             } else {
                 msg << stamp( __FUNCTION__ ) << "Could not open file";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             }
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_sockets = false;
-            socket_queue.pop_back();
+            socket_queue.pop_front();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
             msg << stamp( __FUNCTION__ ) << "Waiting for socket to insert";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             printed_wait = true;
         }
@@ -1405,21 +1451,44 @@ void download_loop() {
             std::string path = download_JSON( next_change_id );
             // Add file to the queue
             std::lock_guard<std::mutex> lock( queue_mutex );
-            downloaded_files.push_back( next_change_id );
 
             // Read JSON file to extract next change id
             std::ifstream file( path.c_str() );
             std::stringstream sstr;
             sstr << file.rdbuf();
+
             document.Parse( sstr.str().c_str());
+
             // If document is not valid, do not change the change id
-            if ( !document.IsObject() || document["next_change_id"].IsNull()) {
-                msg << stamp( __FUNCTION__ ) << "Change ID " 
-                    << next_change_id << " empty";
+            if ( !document.IsObject() || !document.HasMember("next_change_id") || document["next_change_id"].IsNull()) {
+                msg << stamp( __FUNCTION__ ) << "Change ID "
+                    << next_change_id << " has missing next_change_id or invalid JSON. Waiting 20 seconds to retry.";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
+
+                msg << stamp( __FUNCTION__ ) << "Change ID " << next_change_id;
+                if (!document.IsObject()) {
+                    msg <<  " was not an object.";
+                } else if (!document.HasMember("next_change_id")) {
+                    msg << " did not have a next_change_id member.";
+                } else if (document["next_change_id"].IsNull()) {
+                    msg << " has null value for next_change_id";
+                }
+
+                cout_mutex.lock();
+                std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
+                msg.str( "" );
+
+                // Probably getting rate limited. Wait THROTTLE_DELAY seconds.
+                std::this_thread::sleep_for(std::chrono::milliseconds( THROTTLE_DELAY * 1000 ));
                 continue;
             }
+
+            downloaded_files.push_back( next_change_id );
+
             const rapidjson::Value& change_id = document["next_change_id"];
             next_change_id = (char*) change_id.GetString();
 
@@ -1493,7 +1562,9 @@ void processing_loop() {
                 << " over " << round( time_sec_conv.amount, 2 ) << " " 
                 << time_sec_conv.unit << " at " << MAGENTA << speed 
                 << RESET << " insert/s";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             msg << stamp( __FUNCTION__ ) << "Time profile: "
                 << "JSON: " << round( time_loading_JSON, 2 ) << " sec, "
@@ -1503,7 +1574,9 @@ void processing_loop() {
                 << std::ceil( time_other * 100 / time_sec ) << " %), "
                 << "remain: " << round( remaning_time, 2 ) << " sec ("
                 << std::ceil( remaning_time * 100 / time_sec ) << " %)";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             msg << stamp( __FUNCTION__ ) 
                 << "Total entries processed: " << total_sum 
@@ -1514,11 +1587,15 @@ void processing_loop() {
                 << " over " << round( total_time_conv.amount, 2 ) << " " 
                 << total_time_conv.unit << " at " << MAGENTA << total_speed 
                 << RESET << " insert/s";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             msg << stamp( __FUNCTION__ ) 
                 << downloaded_files.size() << " files to be processed";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             // If we should log statistics to file
             if ( LOG_STAT ) {
@@ -1536,7 +1613,9 @@ void processing_loop() {
         // If we are out of files to parse
         if ( !interrupt && !printed_wait ) {
             msg << stamp( __FUNCTION__ ) << "Waiting for files to process";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             printed_wait = true;
         }
@@ -1562,7 +1641,9 @@ void cleanup( const int s ) {
     msg << stamp( __FUNCTION__ ) << RED 
         << "Caught interrupt signal, exiting gracefully" 
         << RESET;
+    cout_mutex.lock();
     std::cout << msg.str() << std::endl;
+    cout_mutex.unlock();
     msg.str( "" );
     while ( !end_program ) {
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
@@ -1576,7 +1657,9 @@ void cleanup( const int s ) {
                   << "Waiting for " << mod_queue_size 
                   << " mod batch(es) to end program" 
                   << RESET;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
     }
     if ( property_queue_size > 0 ) {
@@ -1584,7 +1667,9 @@ void cleanup( const int s ) {
                   << "Waiting for " << property_queue_size 
                   << " property batch(es) to end program"
                   << RESET;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
     }
     if ( requirement_queue_size > 0 ) {
@@ -1592,7 +1677,9 @@ void cleanup( const int s ) {
                   << "Waiting for " << requirement_queue_size 
                   << " requirement batch(es) to end program"
                   << RESET;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
     }
     if ( socket_queue_size > 0 ) {
@@ -1600,7 +1687,9 @@ void cleanup( const int s ) {
             << "Waiting for " << socket_queue_size 
             << " socket batch(es) to end program"
             << RESET;
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
     }
 }
@@ -1631,7 +1720,8 @@ void bench( const std::string path ) {
         time_properties + time_sockets + time_requirements + time_other );
     Time total_time_conv = format_time( total_time * 1000.0 );
     Time time_sec_conv   = format_time( time_sec * 1000.0 );
-    
+
+    cout_mutex.lock();
     std::cout << stamp( __FUNCTION__ ) << "Entries total: " 
               << sum << ", added: " << GREEN
               << item_added << RESET << ", removed: " << RED << item_removed 
@@ -1666,6 +1756,7 @@ void bench( const std::string path ) {
               << " over " << round( total_time_conv.amount, 2 ) << " " 
               << total_time_conv.unit << " at " << MAGENTA << total_speed 
               << RESET << " insert/s" << std::endl;
+    cout_mutex.unlock();
 }
  
  /**
@@ -1720,7 +1811,9 @@ int main( int argc, char* argv[]) {
         float time_DB = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
         msg << stamp( __FUNCTION__ ) << "Connected to DB in " 
             << time_DB << " sec";
+        cout_mutex.lock();
         std::cout << msg.str() << std::endl;
+        cout_mutex.unlock();
         msg.str( "" );
 
         // Catch interrupt signal
@@ -1736,27 +1829,37 @@ int main( int argc, char* argv[]) {
             next_change_id = argv[1];
             msg << stamp( __FUNCTION__ ) << "Resuming from input chunk " 
                 << "(" << next_change_id << ")";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
         } else {
             msg << stamp( __FUNCTION__ ) << "Checking last downloaded chunk";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
             next_change_id = last_downloaded_chunk();
         }
         if ( next_change_id.compare( "" ) != 0 ) {
             if ( next_change_id.compare( "-1" ) == 0 ) {
                 msg << stamp( __FUNCTION__ ) << "New indexation: ";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             } else {
                 msg << stamp( __FUNCTION__ ) << "Next change id: " 
                     << next_change_id;
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
                 msg << stamp( __FUNCTION__ ) 
                     << downloaded_files.size() << " files to be processed";
+                cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
                 msg.str( "" );
             }
             // Start insertion threads
@@ -1771,7 +1874,9 @@ int main( int argc, char* argv[]) {
         } else {
             msg << stamp( __FUNCTION__ ) 
                 << "There was an error fetching next change id";
+            cout_mutex.lock();
             std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
             msg.str( "" );
         }
 

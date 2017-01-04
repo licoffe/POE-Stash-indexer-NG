@@ -37,10 +37,10 @@ To run the indexer, you will need to install the required dependencies:
 On MacOS, download [Mysql-c++-connector](https://dev.mysql.com/downloads/connector/cpp/1.1.html). Extract the archive and copy the content of the `lib` folder to `/usr/local/lib`, and the content of the `include` folder to `/usr/local/include`. Next, download [RapidJSON](http://rapidjson.org/) and copy the content of `include` to `/usr/local/include`.
 
 ## Ubuntu
-On Ubuntu, install the following packages using `apt-get install libcurl4-gnutls-dev libcurlpp-dev libmysqlcppconn-dev`. You may have to edit your MySQL configuration file (**my.cnf**) to authorize the LOAD DATA INFILE statement. You will also have to download RapidJSON. Next, download [RapidJSON](http://rapidjson.org/) and copy the content of `include` to `/usr/local/include`.
+On Ubuntu, install the following packages using `apt-get install libcurl4-gnutls-dev libcurlpp-dev libmysqlcppconn-dev`. You may have to edit your MySQL configuration file (**my.cnf**) to authorize the LOAD DATA INFILE statement. Next, download [RapidJSON](http://rapidjson.org/) and copy the content of `include` to `/usr/local/include`.
 
 # Compilation and setup
 
-When all dependencies have been installed, open up a terminal and change directory to the indexer one and type `make macos` or `make linux`. If all dependencies have been found, the code should now be compiled. Import the **schema.sql** DB scheme in your MySQL installation. The last step is to edit the **config.cfg** file to put the right credentials in.
+When all dependencies have been installed, open up a terminal and change directory to the indexer one and type `make` to generate the binary. If all dependencies have been found, the code should now be compiled. Import the **schema.sql** DB scheme in your MySQL installation. The last step is to edit the **config.cfg** file to put the right credentials in.
 
-When compiled, just run the indexer using `./indexer`.
+When compiled, just run the indexer using `./indexer`. The program also allows to start from a specific change_id using `./indexer change_id`.
