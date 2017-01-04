@@ -24,6 +24,8 @@
 #include <regex>
 #include <cmath>
 #include <mutex>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <curl/curl.h>
 #include <mysql_connection.h>
 #include <mysql_driver.h>
@@ -137,8 +139,11 @@ const std::string DB_DATA_DIR = reader.get( "DB_DATA_DIR" );
 // How many files should be downloaded ahead
 const int DOWNLOAD_AHEAD_SIZE = 10;
 // How many files to parse before sending to DB
-const int FLUSH_SIZE          = 1;
+const int FLUSH_SIZE          = 10;
+const bool LOG_STAT           = true;
 bool interrupt                = false; // Set to true on ctr + C, exit threads
+/* Set to true by processing loop after flushing parsed item properties to queues */
+bool end_program              = false;
 // Statistic variables   
 int item_added                = 0; // Amount of items added in the last batch
 int item_removed              = 0; // Amount of items removed in the last batch
@@ -1170,37 +1175,38 @@ void query( const std::string str ) {
 void mod_loop() {
     bool printed_wait = false;
     std::stringstream msg;
-    while ( !interrupt ) {
-        while ( mod_queue.size() > 0 ) {
+    while ( true ) {
+        if ( mod_queue.size() == 0 && end_program ) {
+            return;
+        }
+        if ( !inserting_mods && mod_queue.size() > 0 ) {
             printed_wait = false;
-            if ( !inserting_mods ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting mod batch (" 
-                    << mod_queue.size() << " to go)";
+            msg << stamp( __FUNCTION__ ) << "Inserting mod batch (" 
+                << mod_queue.size() << " to go)";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
+            std::vector<Mod> mods = mod_queue.front();
+            inserting_mods = true;
+            // insert mods batch
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            std::ofstream mod_file;
+            mod_file.open( DB_DATA_DIR + "/mods.txt" );
+            if ( mod_file.is_open()) {
+                for ( std::vector<Mod>::iterator it = mods.begin() ; 
+                    it != mods.end(); ++it ) {
+                    mod_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->value3 << "," << it->value4 << "," << it->type << "," << it->mod_key << std::endl;
+                }
+                mod_file.close();
+                threaded_insert( "LOAD DATA CONCURRENT INFILE 'mods.txt' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            } else {
+                msg << stamp( __FUNCTION__ ) << "Could not open file";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
-                std::vector<Mod> mods = mod_queue.front();
-                inserting_mods = true;
-                // insert mods batch
-                std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-                std::ofstream mod_file;
-                mod_file.open( DB_DATA_DIR + "/mods.txt" );
-                if ( mod_file.is_open()) {
-                    for ( std::vector<Mod>::iterator it = mods.begin() ; 
-                        it != mods.end(); ++it ) {
-                        mod_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->value3 << "," << it->value4 << "," << it->type << "," << it->mod_key << std::endl;
-                    }
-                    mod_file.close();
-                    threaded_insert( "LOAD DATA CONCURRENT INFILE 'mods.txt' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-                } else {
-                    msg << stamp( __FUNCTION__ ) << "Could not open file";
-                    std::cout << msg.str() << std::endl;
-                    msg.str( "" );
-                }
-                std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-                time_mods += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-                inserting_mods = false;
-                mod_queue.pop_back();
             }
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            time_mods += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
+            inserting_mods = false;
+            mod_queue.pop_back();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
@@ -1225,37 +1231,38 @@ void mod_loop() {
 void requirement_loop() {
     bool printed_wait = false;
     std::stringstream msg;
-    while ( !interrupt ) {
-        while ( requirement_queue.size() > 0 ) {
+    while ( true ) {
+        if ( requirement_queue.size() == 0 && end_program ) {
+            return;
+        }   
+        if ( !inserting_requirements && requirement_queue.size() > 0 ) {
             printed_wait = false;
-            if ( !inserting_requirements ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting requirement batch (" 
-                    << requirement_queue.size() << " to go)";
+            msg << stamp( __FUNCTION__ ) << "Inserting requirement batch (" 
+                << requirement_queue.size() << " to go)";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
+            std::vector<Requirement> requirements = requirement_queue.front();
+            inserting_requirements = true;
+            // insert mods batch
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            std::ofstream requirement_file;
+            requirement_file.open( DB_DATA_DIR + "/requirements.txt" );
+            if ( requirement_file.is_open()) {
+                for ( std::vector<Requirement>::iterator it = requirements.begin() ; 
+                    it != requirements.end(); ++it ) {
+                    requirement_file << it->item_id << "," << it->name << "," << it->value << "," << it->requirement_key << std::endl;
+                }
+                requirement_file.close();
+                threaded_insert( "LOAD DATA CONCURRENT INFILE 'requirements.txt' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            } else {
+                msg << stamp( __FUNCTION__ ) << "Could not open file";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
-                std::vector<Requirement> requirements = requirement_queue.front();
-                inserting_requirements = true;
-                // insert mods batch
-                std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-                std::ofstream requirement_file;
-                requirement_file.open( DB_DATA_DIR + "/requirements.txt" );
-                if ( requirement_file.is_open()) {
-                    for ( std::vector<Requirement>::iterator it = requirements.begin() ; 
-                        it != requirements.end(); ++it ) {
-                        requirement_file << it->item_id << "," << it->name << "," << it->value << "," << it->requirement_key << std::endl;
-                    }
-                    requirement_file.close();
-                    threaded_insert( "LOAD DATA CONCURRENT INFILE 'requirements.txt' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-                } else {
-                    msg << stamp( __FUNCTION__ ) << "Could not open file";
-                    std::cout << msg.str() << std::endl;
-                    msg.str( "" );
-                }
-                std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-                time_requirements += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-                inserting_requirements = false;
-                requirement_queue.pop_back();
             }
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            time_requirements += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
+            inserting_requirements = false;
+            requirement_queue.pop_back();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
@@ -1280,37 +1287,38 @@ void requirement_loop() {
 void property_loop() {
     bool printed_wait = false;
     std::stringstream msg;
-    while ( !interrupt ) {
-        while ( property_queue.size() > 0 ) {
+    while ( true ) {
+        if ( property_queue.size() == 0 && end_program ) {
+            return;
+        }
+        if ( !inserting_properties && property_queue.size() > 0 ) {
             printed_wait = false;
-            if ( !inserting_properties ) {
-                msg << stamp( __FUNCTION__ ) << "Inserting property batch (" 
-                    << property_queue.size() << " to go)";
+            msg << stamp( __FUNCTION__ ) << "Inserting property batch (" 
+                << property_queue.size() << " to go)";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
+            std::vector<Property> properties = property_queue.front();
+            inserting_properties = true;
+            // insert mods batch
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            std::ofstream property_file;
+            property_file.open( DB_DATA_DIR + "/properties.txt" );
+            if ( property_file.is_open()) {
+                for ( std::vector<Property>::iterator it = properties.begin() ; 
+                    it != properties.end(); ++it ) {
+                    property_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->property_key << std::endl;
+                }
+                property_file.close();
+                threaded_insert( "LOAD DATA CONCURRENT INFILE 'properties.txt' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            } else {
+                msg << stamp( __FUNCTION__ ) << "Could not open file";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
-                std::vector<Property> properties = property_queue.front();
-                inserting_properties = true;
-                // insert mods batch
-                std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-                std::ofstream property_file;
-                property_file.open( DB_DATA_DIR + "/properties.txt" );
-                if ( property_file.is_open()) {
-                    for ( std::vector<Property>::iterator it = properties.begin() ; 
-                        it != properties.end(); ++it ) {
-                        property_file << it->item_id << "," << it->name << "," << it->value1 << "," << it->value2 << "," << it->property_key << std::endl;
-                    }
-                    property_file.close();
-                    threaded_insert( "LOAD DATA CONCURRENT INFILE 'properties.txt' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-                } else {
-                    msg << stamp( __FUNCTION__ ) << "Could not open file";
-                    std::cout << msg.str() << std::endl;
-                    msg.str( "" );
-                }
-                std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-                time_properties += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-                inserting_properties = false;
-                property_queue.pop_back();
             }
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            time_properties += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
+            inserting_properties = false;
+            property_queue.pop_back();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
@@ -1335,37 +1343,38 @@ void property_loop() {
 void socket_loop() {
     bool printed_wait = false;
     std::stringstream msg;
-    while ( !interrupt ) {
-        while ( socket_queue.size() > 0 ) {
-            if ( !inserting_sockets ) {
-                printed_wait = false;
-                msg << stamp( __FUNCTION__ ) << "Inserting socket batch (" 
-                    << socket_queue.size() << " to go)";
+    while ( true ) {
+        if ( socket_queue.size() == 0 && end_program ) {
+            return;
+        }
+        if ( !inserting_sockets && socket_queue.size() > 0 ) {
+            printed_wait = false;
+            msg << stamp( __FUNCTION__ ) << "Inserting socket batch (" 
+                << socket_queue.size() << " to go)";
+            std::cout << msg.str() << std::endl;
+            msg.str( "" );
+            std::vector<Socket> sockets = socket_queue.front();
+            inserting_sockets = true;
+            // insert socket batch
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            std::ofstream socket_file;
+            socket_file.open(  DB_DATA_DIR + "/sockets.txt" );
+            if ( socket_file.is_open()) {
+                for ( std::vector<Socket>::iterator it = sockets.begin() ; 
+                    it != sockets.end(); ++it ) {
+                    socket_file << it->item_id << "," << it->group << "," << it->attr << "," << it->socket_key << std::endl;
+                }
+                socket_file.close();
+                threaded_insert( "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
+            } else {
+                msg << stamp( __FUNCTION__ ) << "Could not open file";
                 std::cout << msg.str() << std::endl;
                 msg.str( "" );
-                std::vector<Socket> sockets = socket_queue.front();
-                inserting_sockets = true;
-                // insert socket batch
-                std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-                std::ofstream socket_file;
-                socket_file.open(  DB_DATA_DIR + "/sockets.txt" );
-                if ( socket_file.is_open()) {
-                    for ( std::vector<Socket>::iterator it = sockets.begin() ; 
-                        it != sockets.end(); ++it ) {
-                        socket_file << it->item_id << "," << it->group << "," << it->attr << "," << it->socket_key << std::endl;
-                    }
-                    socket_file.close();
-                    threaded_insert( "LOAD DATA CONCURRENT INFILE 'sockets.txt' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
-                } else {
-                    msg << stamp( __FUNCTION__ ) << "Could not open file";
-                    std::cout << msg.str() << std::endl;
-                    msg.str( "" );
-                }
-                std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-                time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-                inserting_sockets = false;
-                socket_queue.pop_back();
             }
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
+            inserting_sockets = false;
+            socket_queue.pop_back();
         }
         // If we are out of entries to insert
         if ( !interrupt && !printed_wait ) {
@@ -1425,7 +1434,7 @@ void download_loop() {
             }
         // If we downloaded enough files ahead, wait 1 sec
         } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds( 1000 ));
+            std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
         }
     }
     // std::cout << "Exiting download_loop" << std::endl;
@@ -1442,7 +1451,7 @@ void processing_loop() {
     std::stringstream msg;
     while ( !interrupt ) {
         std::deque<std::string>::iterator it = downloaded_files.begin();
-        while ( it != downloaded_files.end() && !interrupt && downloaded_files.size() > 2 ) {
+        if ( it != downloaded_files.end() && downloaded_files.size() > 2 ) {
             printed_wait = false;
             item_added   = 0;
             item_updated = 0;
@@ -1458,7 +1467,7 @@ void processing_loop() {
             // std::cout << std::endl << "Removing " << path << std::endl;
             std::remove( path.c_str());
             std::lock_guard<std::mutex> lock(queue_mutex);
-            *it++;
+            // *it++;
             // Remove this file from the queue
             downloaded_files.pop_front();
             // Print stats: amount of item parsed, times
@@ -1511,6 +1520,18 @@ void processing_loop() {
                 << downloaded_files.size() << " files to be processed";
             std::cout << msg.str() << std::endl;
             msg.str( "" );
+            // If we should log statistics to file
+            if ( LOG_STAT ) {
+                std::ofstream stat_file;
+                stat_file.open( "./stats.csv", std::ios_base::app );
+                if ( stat_file.is_open()) {
+                    stat_file << get_current_timestamp().count() << ", " <<	time_sec << ", " 
+                              << time_item << ", " << time_other << ", " 
+                              << item_added << ", " << item_removed << ", " 
+                              << item_updated << std::endl;
+                    stat_file.close();
+                }
+            }
         }
         // If we are out of files to parse
         if ( !interrupt && !printed_wait ) {
@@ -1521,6 +1542,11 @@ void processing_loop() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
     }
+    mod_queue.push_front( parsed_mods );
+    requirement_queue.push_front( parsed_requirements );
+    property_queue.push_front( parsed_properties );
+    socket_queue.push_front( parsed_sockets );
+    end_program = true;
     // std::cout << "Exiting processing_loop" << std::endl;
 }
 
@@ -1538,6 +1564,9 @@ void cleanup( const int s ) {
         << RESET;
     std::cout << msg.str() << std::endl;
     msg.str( "" );
+    while ( !end_program ) {
+        std::this_thread::sleep_for(std::chrono::milliseconds( 100 ));
+    }
     int mod_queue_size         = mod_queue.size();
     int property_queue_size    = property_queue.size();
     int requirement_queue_size = requirement_queue.size();
