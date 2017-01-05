@@ -1444,6 +1444,13 @@ void download_loop() {
     rapidjson::Document document;
     std::stringstream msg;
 
+    // Check if data dir exists
+    struct stat info;
+    // If dir does not exist, create it
+    if ( stat( "./data", &info ) != 0 ) {
+        mkdir( "./data", 0700 );
+    }
+
     while ( !interrupt ) {
         // If we can download some more files ahead
         if ( downloaded_files.size() < DOWNLOAD_AHEAD_SIZE ) {
@@ -1593,6 +1600,19 @@ void processing_loop() {
             msg.str( "" );
             msg << stamp( __FUNCTION__ ) 
                 << downloaded_files.size() << " files to be processed";
+            cout_mutex.lock();
+            std::cout << msg.str() << std::endl;
+            cout_mutex.unlock();
+            msg.str( "" );
+            msg << "downloaded_files: " << downloaded_files.size() << ", "
+                << "mod_queue: " << mod_queue.size() << ", "
+                << "requirement_queue: " << requirement_queue.size() << ", "
+                << "property_queue: " << property_queue.size() << ", "
+                << "socket_queue: " << socket_queue.size() << ", "
+                << "parsed_mods: " << parsed_mods.size() << ", "
+                << "parsed_requirements: " << parsed_requirements.size() << ", "
+                << "parsed_properties: " << parsed_properties.size() << ", "
+                << "parsed_sockets: " << parsed_sockets.size();
             cout_mutex.lock();
             std::cout << msg.str() << std::endl;
             cout_mutex.unlock();
