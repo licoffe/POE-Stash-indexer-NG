@@ -1441,7 +1441,6 @@ void socket_loop() {
  * @return Nothing
  */
 void download_loop() {
-    rapidjson::Document document;
     std::stringstream msg;
 
     // Check if data dir exists
@@ -1452,12 +1451,11 @@ void download_loop() {
     }
 
     while ( !interrupt ) {
+        rapidjson::Document document;
         // If we can download some more files ahead
         if ( downloaded_files.size() < DOWNLOAD_AHEAD_SIZE ) {
             // Download the next change id
             std::string path = download_JSON( next_change_id );
-            // Add file to the queue
-            std::lock_guard<std::mutex> lock( queue_mutex );
 
             // Read JSON file to extract next change id
             std::ifstream file( path.c_str() );
@@ -1494,7 +1492,10 @@ void download_loop() {
                 continue;
             }
 
+            // Add file to the queue
+            queue_mutex.lock();
             downloaded_files.push_back( next_change_id );
+            queue_mutex.unlock();
 
             const rapidjson::Value& change_id = document["next_change_id"];
             next_change_id = (char*) change_id.GetString();
@@ -1542,10 +1543,11 @@ void processing_loop() {
             std::string path = download_dir + "indexer_" + *it + ".json";
             // std::cout << std::endl << "Removing " << path << std::endl;
             std::remove( path.c_str());
-            std::lock_guard<std::mutex> lock(queue_mutex);
-            // *it++;
+            queue_mutex.lock();
             // Remove this file from the queue
             downloaded_files.pop_front();
+            std::deque<std::string>( downloaded_files ).swap( downloaded_files );
+            queue_mutex.unlock();
             // Print stats: amount of item parsed, times
             total_item_added    += item_added;
             total_item_updated  += item_updated;
