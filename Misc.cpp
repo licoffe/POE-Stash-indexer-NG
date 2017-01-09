@@ -84,3 +84,18 @@ std::string get_current_dir() {
     getcwd( cwd, FILENAME_MAX );
     return std::string( cwd );
 }
+
+// http://stackoverflow.com/questions/440133/how-do-i-create-a-random-alpha-numeric-string-in-c
+std::string random_id( const int len ) {
+    std::stringstream str;
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+
+    for ( int i = 0 ; i < len ; ++i ) {
+        str << alphanum[rand() % ( sizeof( alphanum ) - 1 )];
+    }
+
+    return str.str();
+}

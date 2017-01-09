@@ -28,4 +28,6 @@ std::string replace_string( std::string, const std::string&, const std::string& 
 
 std::string get_current_dir();
 
+std::string random_id( const int len );
+
 #endif /* _MISC_H_ */
