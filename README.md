@@ -23,6 +23,33 @@ The [RapidJSON](http://rapidjson.org/) library is used to parse JSON files.
 
 Storage is done through MySQL (see schema.sql) and the interface with MySQL is done through the [Connector/C++](https://dev.mysql.com/downloads/connector/cpp/1.1.html) library, the official MySQL C++ communication API.
 
+# Performances
+
+**Hardware**
+
+Hardware Intel Xeon W3520 (4 cores / 8 threads at 2.66 GHz+)	with 16 Go RAM and SSD storage.
+
+**MySQL settings**
+
+    innodb_buffer_pool_size = 12G
+    innodb_log_file_size = 2047M
+    innodb_flush_log_at_trx_commit = 2
+    innodb_flush_method = O_DIRECT
+    innodb_file_per_table=1
+    innodb_stats_on_metadata = OFF
+    innodb_buffer_pool_instances = 8
+    query_cache_type = 0
+    innodb_lock_wait_timeout = 50
+    innodb_log_buffer_size = 8M
+
+**Results**
+
+The indexer memory consumption is very small, about 300 MB (2%).
+
+The plot below shows the evolution of item insertion speed across time.
+
+![alt](./bench.png)
+
 # Installing required libraries
 
 The first thing you need is to have a running MySQL installation correctly tuned for your hardware.
