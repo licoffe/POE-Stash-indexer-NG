@@ -557,7 +557,7 @@ void write_parsed_to_file() {
     if ( mod_file.is_open()) {
         for ( std::vector<Mod>::iterator it = parsed_mods.begin() ; 
             it != parsed_mods.end(); ++it ) {
-            mod_file << "\\N, " << it->item_id << "," << it->name << "," << it->value1 
+            mod_file << it->item_id << "," << it->name << "," << it->value1 
                      << "," << it->value2 << "," << it->value3 << "," 
                      << it->value4 << "," << it->type << "," << it->mod_key 
                      << std::endl;
@@ -579,7 +579,7 @@ void write_parsed_to_file() {
     if ( requirement_file.is_open()) {
         for ( std::vector<Requirement>::iterator it = parsed_requirements.begin() ; 
             it != parsed_requirements.end(); ++it ) {
-            requirement_file << "\\N, " << it->item_id << "," << it->name << "," 
+            requirement_file << it->item_id << "," << it->name << "," 
                              << it->value << "," << it->requirement_key 
                              << std::endl;
         }
@@ -600,7 +600,7 @@ void write_parsed_to_file() {
     if ( property_file.is_open()) {
         for ( std::vector<Property>::iterator it = parsed_properties.begin() ; 
             it != parsed_properties.end(); ++it ) {
-            property_file << "\\N, " << it->item_id << "," << it->name << "," 
+            property_file << it->item_id << "," << it->name << "," 
                           << it->value1 << "," << it->value2 << "," 
                           << it->property_key << std::endl;
         }
@@ -621,7 +621,7 @@ void write_parsed_to_file() {
     if ( socket_file.is_open()) {
         for ( std::vector<Socket>::iterator it = parsed_sockets.begin() ; 
             it != parsed_sockets.end(); ++it ) {
-            socket_file << "\\N, " << it->item_id << "," << it->group << "," 
+            socket_file << it->item_id << "," << it->group << "," 
                         << it->attr << "," << it->socket_key << std::endl;
         }
         socket_file.close();
