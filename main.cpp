@@ -552,7 +552,7 @@ void write_parsed_to_file() {
     std::ostringstream path;
     std::stringstream  msg;
 
-    path << DB_DATA_DIR << "/mods_" << mod_queue.size() << ".txt";
+    path << DB_DATA_DIR << "/mods_" << random_id(10) << ".txt";
     mod_file.open( path.str());
     if ( mod_file.is_open()) {
         for ( std::vector<Mod>::iterator it = parsed_mods.begin() ; 
@@ -564,7 +564,7 @@ void write_parsed_to_file() {
         }
         mod_file.close();
         // Add file id to the queue
-        mod_queue.push_front( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
+        mod_queue.push_back( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
     } else {
         msg << stamp( __FUNCTION__ ) << "Could not open file";
         cout_mutex.lock();
@@ -574,7 +574,7 @@ void write_parsed_to_file() {
     }
     path.str( "" );
 
-    path << DB_DATA_DIR << "/requirements_" << requirement_queue.size() << ".txt";
+    path << DB_DATA_DIR << "/requirements_" << random_id(10) << ".txt";
     requirement_file.open( path.str());
     if ( requirement_file.is_open()) {
         for ( std::vector<Requirement>::iterator it = parsed_requirements.begin() ; 
@@ -585,7 +585,7 @@ void write_parsed_to_file() {
         }
         requirement_file.close();
         // Add file id to the queue
-        requirement_queue.push_front( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
+        requirement_queue.push_back( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
     } else {
         msg << stamp( __FUNCTION__ ) << "Could not open file";
         cout_mutex.lock();
@@ -595,7 +595,7 @@ void write_parsed_to_file() {
     }
     path.str( "" );
 
-    path << DB_DATA_DIR << "/properties_" << property_queue.size() << ".txt";
+    path << DB_DATA_DIR << "/properties_" << random_id(10) << ".txt";
     property_file.open( path.str());
     if ( property_file.is_open()) {
         for ( std::vector<Property>::iterator it = parsed_properties.begin() ; 
@@ -606,7 +606,7 @@ void write_parsed_to_file() {
         }
         property_file.close();
         // Add file id to the queue
-        property_queue.push_front( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
+        property_queue.push_back( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
     } else {
         msg << stamp( __FUNCTION__ ) << "Could not open file";
         cout_mutex.lock();
@@ -616,7 +616,7 @@ void write_parsed_to_file() {
     }
     path.str( "" );
 
-    path << DB_DATA_DIR << "/sockets_" << socket_queue.size() << ".txt";
+    path << DB_DATA_DIR << "/sockets_" << random_id(10) << ".txt";
     socket_file.open( path.str());
     if ( socket_file.is_open()) {
         for ( std::vector<Socket>::iterator it = parsed_sockets.begin() ; 
@@ -626,7 +626,7 @@ void write_parsed_to_file() {
         }
         socket_file.close();
         // Add file id to the queue
-        socket_queue.push_front( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
+        socket_queue.push_back( replace_string( path.str(), DB_DATA_DIR + "/", "" ));
     } else {
         msg << stamp( __FUNCTION__ ) << "Could not open file";
         cout_mutex.lock();
