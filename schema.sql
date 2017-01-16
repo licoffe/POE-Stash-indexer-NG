@@ -130,7 +130,7 @@ CREATE TABLE `Items` (
 
 CREATE TABLE `Mods` (
   `itemId` varchar(128) DEFAULT NULL,
-  `modName` varchar(128) NOT NULL DEFAULT '0',
+  `modName` varchar(1024) NOT NULL DEFAULT '0',
   `modValue1` varchar(256) DEFAULT '0',
   `modValue2` varchar(128) DEFAULT '0',
   `modValue3` varchar(128) DEFAULT '0',
