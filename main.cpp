@@ -1316,6 +1316,7 @@ void mod_loop() {
             threaded_insert( "LOAD DATA CONCURRENT INFILE '" + mod_file + "' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + mod_file;
             std::remove( path.str().c_str());
+            path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_mods += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_mods = false;
@@ -1366,6 +1367,7 @@ void requirement_loop() {
             threaded_insert( "LOAD DATA CONCURRENT INFILE '" + requirement_file + "' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + requirement_file;
             std::remove( path.str().c_str());
+            path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_requirements += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_requirements = false;
@@ -1416,6 +1418,7 @@ void property_loop() {
             threaded_insert( "LOAD DATA CONCURRENT INFILE '" + property_file + "' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + property_file;
             std::remove( path.str().c_str());
+            path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_properties += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_properties = false;
@@ -1466,6 +1469,7 @@ void socket_loop() {
             threaded_insert( "LOAD DATA CONCURRENT INFILE '" + socket_file + "' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + socket_file;
             std::remove( path.str().c_str());
+            path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             time_sockets += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
             inserting_sockets = false;
@@ -1518,7 +1522,8 @@ void download_loop() {
             // If document is not valid, do not change the change id
             if ( !document.IsObject() || !document.HasMember("next_change_id") || document["next_change_id"].IsNull()) {
                 msg << stamp( __FUNCTION__ ) << "Change ID "
-                    << next_change_id << " has missing next_change_id or invalid JSON. Waiting 20 seconds to retry.";
+                    << next_change_id << " has missing next_change_id or invalid JSON. Waiting " 
+                    << THROTTLE_DELAY << " seconds to retry.";
                 cout_mutex.lock();
                 std::cout << msg.str() << std::endl;
                 cout_mutex.unlock();
