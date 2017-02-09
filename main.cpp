@@ -1313,8 +1313,8 @@ void mod_loop() {
             inserting_mods = true;
             // insert mods batch
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + mod_file + "' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + mod_file;
+            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + path.str() + "' REPLACE INTO TABLE `Mods` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             std::remove( path.str().c_str());
             path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -1364,8 +1364,8 @@ void requirement_loop() {
             inserting_requirements = true;
             // insert mods batch
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + requirement_file + "' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + requirement_file;
+            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + path.str() + "' REPLACE INTO TABLE `Requirements` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             std::remove( path.str().c_str());
             path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -1415,8 +1415,8 @@ void property_loop() {
             inserting_properties = true;
             // insert mods batch
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + property_file + "' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + property_file;
+            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + path.str() + "' REPLACE INTO TABLE `Properties` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             std::remove( path.str().c_str());
             path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -1466,8 +1466,8 @@ void socket_loop() {
             inserting_sockets = true;
             // insert socket batch
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + socket_file + "' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             path << DB_DATA_DIR + "/" + socket_file;
+            threaded_insert( "LOAD DATA CONCURRENT INFILE '" + path.str() + "' REPLACE INTO TABLE `Sockets` FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\"' LINES TERMINATED BY '\n'" );
             std::remove( path.str().c_str());
             path.str( "" );
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
