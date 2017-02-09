@@ -291,7 +291,7 @@ std::string last_downloaded_chunk() {
     sql::ResultSet  *res = NULL;
     try {
         stmt = download_con->createStatement();
-        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` ORDER BY ID ASC LIMIT 1"  );
+        res  = stmt->executeQuery( "SELECT `nextChangeId` FROM `ChangeId` ORDER BY ID DESC LIMIT 1"  );
         while ( res->next()) {
             downloaded_files.push_back( res->getString( "nextChangeId" ));
         }
