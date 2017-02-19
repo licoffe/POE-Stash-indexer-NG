@@ -1287,7 +1287,7 @@ void query( const std::string str ) {
 }
 
 /**
- * Flush all parsed mods stored in the queue to text files at a refular interval
+ * Flush all parsed mods stored in the queue to text files at a regular interval
  * and import each of these files through LOAD DATA. Runs in its own thread.
  *
  * @param Nothing
@@ -1337,7 +1337,7 @@ void mod_loop() {
 }
 
 /**
- * Flush all parsed requirements stored in the queue to text files at a refular 
+ * Flush all parsed requirements stored in the queue to text files at a regular 
  * interval and import each of these files through LOAD DATA. Runs in its own 
  * thread.
  *
@@ -1388,7 +1388,7 @@ void requirement_loop() {
 }
 
 /**
- * Flush all parsed properties stored in the queue to text files at a refular 
+ * Flush all parsed properties stored in the queue to text files at a regular 
  * interval and import each of these files through LOAD DATA. Runs in its own 
  * thread.
  *
@@ -1439,7 +1439,7 @@ void property_loop() {
 }
 
 /**
- * Flush all parsed sockets stored in the queue to text files at a refular 
+ * Flush all parsed sockets stored in the queue to text files at a regular 
  * interval and import each of these files through LOAD DATA. Runs in its own 
  * thread.
  *
