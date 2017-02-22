@@ -690,6 +690,9 @@ void parse_JSON( const std::string path ) {
     sql::PreparedStatement   *item_stmt = processing_con->prepareStatement( "INSERT INTO `Items` (`w`, `h`, `ilvl`, `icon`, `league`, `itemId`, `name`, `typeLine`, `identified`, `verified`, `crafted`, `enchanted`, `corrupted`, `lockedToCharacter`, `frameType`, `x`, `y`, `inventoryId`, `accountName`, `stashId`, `socketAmount`, `linkAmount`, `available`, `addedTs`, `updatedTs`, `flavourText`, `price`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1', ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `name` = ?, `verified` = ?, `crafted` = ?, `enchanted` = ?, `corrupted` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = '1', `updatedTs` = ?, `price` = ?" );
     sql::PreparedStatement   *remove_item_stmt = processing_con->prepareStatement(
         "UPDATE `Items` SET `ilvl` = ?, `icon` = ?, `league` = ?, `name` = ?, `typeLine` = ?, `identified` = ?, `verified` = ?, `corrupted` = ?, `lockedToCharacter` = ?, `frameType` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = 0, `updatedTs` = ? WHERE `itemId` = ?" );
+    sql::PreparedStatement   *remove_stash_stmt = processing_con->prepareStatement(
+        "DELETE `Items`, `Stashes` FROM `Items`, `Stashes` WHERE `Items`.`stashId` = `Stashes`.`stashId` AND `Items`.`stashId` = ?"
+    );
     end = std::chrono::steady_clock::now();
     time_other += ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
     try {
@@ -705,16 +708,30 @@ void parse_JSON( const std::string path ) {
         begin = std::chrono::steady_clock::now();
         const rapidjson::Value& array   = stashes[i];
         std::string account_name        = "";
+        std::string stash_id            = array["id"].GetString();
         // If there is a valid accountName value
         if ( array.HasMember( "accountName" ) && !array["accountName"].IsNull()) {
             assert(array["accountName"].IsString());
             account_name = array["accountName"].GetString();
+        // Stash no longer exists and items should be removed
         } else {
-            // If not, skip this stash tab
-            continue;
+                msg << stamp( __FUNCTION__ ) << "Stash " << stash_id 
+                    << " no longer exists, removing items";
+                cout_mutex.lock();
+                std::cout << msg.str() << std::endl;
+                cout_mutex.unlock();
+                msg.str( "" );
+            try {
+                remove_stash_stmt->setString( 1, stash_id );
+                remove_stash_stmt->execute();
+                continue;
+            } catch ( sql::SQLException &e ) {
+                errors++;
+                print_sql_error( e );
+                continue;
+            }
         }
         std::string last_character_name = array["lastCharacterName"].GetString();
-        std::string stash_id            = array["id"].GetString();
         std::string stash_name          = array["stash"].GetString();
         std::string stash_type          = array["stashType"].GetString();
         bool public_stash               = array["public"].GetBool();
@@ -1254,6 +1271,7 @@ void parse_JSON( const std::string path ) {
     delete league_stmt;
     delete item_stmt;
     delete remove_item_stmt;
+    delete remove_stash_stmt;
 }
 
 /**
@@ -1768,98 +1786,6 @@ void cleanup( const int s ) {
         std::cout << msg.str() << std::endl;
         cout_mutex.unlock();
         msg.str( "" );
-    }
-}
-
-/**
- * Run a benchmark on a single file
- * 
- * @param Nothing
- * @return Nothing
- */
-void bench( const std::string path ) {
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    parse_JSON( path );
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    
-    total_item_added    += item_added;
-    total_item_updated  += item_updated;
-    total_item_removed  += item_removed;
-    total_errors        += errors;
-    int sum = item_added + item_updated + item_removed;
-    float time_sec = ( std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000000.0 );
-    total_sum          += sum;
-    total_time         += time_sec;
-    float speed         = std::floor( sum / time_sec );
-    float total_speed   = std::floor( total_sum / total_time );
-    float remaning_time = 
-        time_sec - ( time_loading_JSON + time_item + time_mods + 
-        time_properties + time_sockets + time_requirements + time_other );
-    Time total_time_conv = format_time( total_time * 1000.0 );
-    Time time_sec_conv   = format_time( time_sec * 1000.0 );
-
-    cout_mutex.lock();
-    std::cout << stamp( __FUNCTION__ ) << "Entries total: " 
-              << sum << ", added: " << GREEN
-              << item_added << RESET << ", removed: " << RED << item_removed 
-              << RESET << ", updated: " << BLUE
-              << item_updated << RESET << ", insert errors: " << errors
-              << " over " << round( time_sec_conv.amount, 2 ) << " " 
-              << time_sec_conv.unit << " at " << MAGENTA << speed 
-              << RESET << " insert/s" << std::endl;
-    std::cout << stamp( __FUNCTION__ ) << "Time profile: "
-              << "JSON: " << round( time_loading_JSON, 2 ) << " sec, "
-              << "items: " << round( time_item, 2 ) << " sec (" 
-              << std::ceil( time_item * 100 / time_sec ) << " %), "
-              << "mods: " << round( time_mods, 2 ) << " sec (" 
-              << std::ceil( time_mods * 100 / time_sec ) << " %), "
-              << "props: " << round( time_properties, 2 ) << " sec (" 
-              << std::ceil( time_properties * 100 / time_sec ) << " %), "
-              << "socks: " << round( time_sockets, 2 ) << " sec (" 
-              << std::ceil( time_sockets * 100 / time_sec ) << " %), "
-              << "req: " << round( time_requirements, 2 ) << " sec (" 
-              << std::ceil( time_requirements * 100 / time_sec ) << " %) "
-              << "others: " << round( time_other, 2 ) << " sec ("
-              << std::ceil( time_other * 100 / time_sec ) << " %), "
-              << "remain: " << round( remaning_time, 2 ) << " sec ("
-              << std::ceil( remaning_time * 100 / time_sec ) << " %)"
-              << std::endl;
-    std::cout << stamp( __FUNCTION__ ) 
-              << "Total entries processed: " << total_sum 
-              << ", added: " << GREEN << total_item_added << RESET 
-              << ", removed: " << RED << total_item_removed << RESET 
-              << ", updated: " << BLUE << total_item_updated << RESET
-              << ", insert errors: " << total_errors
-              << " over " << round( total_time_conv.amount, 2 ) << " " 
-              << total_time_conv.unit << " at " << MAGENTA << total_speed 
-              << RESET << " insert/s" << std::endl;
-    cout_mutex.unlock();
-}
- 
- /**
- * Run a benchmark on a set of files
- * 
- * @param Nothing
- * @return Nothing
- */
-void benchmark() {
-    std::vector<std::string> files = {
-        "./bench/indexer_31302710-33646811-31252392-36315804-33954900.json",
-        "./bench/indexer_31403451-33753224-31353577-36423092-34054380.json",
-        "./bench/indexer_31404167-33753864-31354065-36423481-34054947.json",
-        "./bench/indexer_31404653-33754420-31354610-36424060-34055582.json",
-        "./bench/indexer_31405237-33755108-31355149-36424484-34055976.json",
-        "./bench/indexer_31405893-33755907-31355736-36425049-34056622.json",
-        "./bench/indexer_31406319-33756638-31356176-36425781-34057270.json",
-        "./bench/indexer_31407025-33757249-31356667-36426425-34057903.json",
-        "./bench/indexer_31407500-33757952-31357532-36426997-34058597.json"
-    };
-    for ( std::vector<std::string>::iterator it = files.begin() ; it != files.end() ; it++ ) {
-        item_added   = 0;
-        item_updated = 0;
-        item_removed = 0;
-        errors       = 0;      
-        bench( *it );
     }
 }
 
