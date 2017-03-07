@@ -687,7 +687,7 @@ void parse_JSON( const std::string path ) {
     sql::PreparedStatement   *account_stmt = processing_con->prepareStatement( "INSERT INTO `Accounts` (`accountName`, `lastCharacterName`, `lastSeen`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `lastSeen` = ?, `lastCharacterName` = ?" );
     sql::PreparedStatement   *stash_stmt = processing_con->prepareStatement( "INSERT INTO `Stashes` (`stashId`, `stashName`, `stashType`, `publicStash`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `stashName` = ?, `stashType` = ?, `publicStash` = ?" ); 
     sql::PreparedStatement   *league_stmt = processing_con->prepareStatement( "INSERT INTO `Leagues` (`leagueName`, `active`, `poeTradeId`) VALUES (?, '1', ?) ON DUPLICATE KEY UPDATE `leagueName` = `leagueName`" );
-    sql::PreparedStatement   *item_stmt = processing_con->prepareStatement( "INSERT INTO `Items` (`w`, `h`, `ilvl`, `icon`, `league`, `itemId`, `name`, `typeLine`, `identified`, `verified`, `crafted`, `enchanted`, `corrupted`, `lockedToCharacter`, `frameType`, `x`, `y`, `inventoryId`, `accountName`, `stashId`, `socketAmount`, `linkAmount`, `available`, `addedTs`, `updatedTs`, `flavourText`, `price`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1', ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `name` = ?, `verified` = ?, `crafted` = ?, `enchanted` = ?, `corrupted` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = '1', `updatedTs` = ?, `price` = ?" );
+    sql::PreparedStatement   *item_stmt = processing_con->prepareStatement( "INSERT INTO `Items` (`w`, `h`, `ilvl`, `icon`, `league`, `itemId`, `name`, `typeLine`, `identified`, `verified`, `crafted`, `enchanted`, `corrupted`, `lockedToCharacter`, `frameType`, `x`, `y`, `inventoryId`, `accountName`, `stashId`, `socketAmount`, `linkAmount`, `available`, `addedTs`, `updatedTs`, `flavourText`, `price`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1', ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `name` = ?, `verified` = ?, `crafted` = ?, `enchanted` = ?, `corrupted` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = '1', `updatedTs` = ?, `price` = ?, `league` = ?" );
     sql::PreparedStatement   *remove_item_stmt = processing_con->prepareStatement(
         "UPDATE `Items` SET `ilvl` = ?, `icon` = ?, `league` = ?, `name` = ?, `typeLine` = ?, `identified` = ?, `verified` = ?, `corrupted` = ?, `lockedToCharacter` = ?, `frameType` = ?, `x` = ?, `y` = ?, `inventoryId` = ?, `accountName` = ?, `stashId` = ?, `socketAmount` = ?, `linkAmount` = ?, `available` = 0, `updatedTs` = ? WHERE `itemId` = ?" );
     sql::PreparedStatement   *remove_stash_stmt = processing_con->prepareStatement(
@@ -903,6 +903,7 @@ void parse_JSON( const std::string path ) {
                     item_stmt->setInt(    38, link_amount );
                     item_stmt->setUInt64( 39, timestamp );
                     item_stmt->setString( 40, price );
+                    item_stmt->setString( 41, league );
                     item_stmt->execute();
                     item_added++;
                 } catch ( sql::SQLException &e ) {
