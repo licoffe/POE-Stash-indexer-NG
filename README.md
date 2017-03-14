@@ -2,7 +2,7 @@
 
 This indexer is for you if you have:
 - A powerful spare computer with a lot of RAM, ideally 16GB to dedicate fully to the task
-- > 300 GB storage
+- At least 300 GB storage
 - Unlimited bandwidth
 - Knowledge in MySQL (How to write MySQL queries, table optimization, index creation, db maintenance)
 
