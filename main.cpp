@@ -809,7 +809,7 @@ void parse_JSON( const std::string path ) {
                     item["typeLine"].GetString(), "<<set:MS>><<set:M>><<set:S>>", "" );
                 bool identified            = item.HasMember("identified") ? item["identified"].GetBool() : false;
                 bool corrupted             = item.HasMember("corrupted") ? item["corrupted"].GetBool() : false;
-                bool locked                = item.HasMember("locked") ? item["locked"].GetBool() : false;
+                bool locked                = item.HasMember("lockedToCharacter") ? item["lockedToCharacter"].GetBool() : false;
                 std::string note;
                 std::string flavour_text   = "";
                 int frame_type = 0;
