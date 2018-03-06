@@ -807,9 +807,9 @@ void parse_JSON( const std::string path ) {
                     item["name"].GetString(), "<<set:MS>><<set:M>><<set:S>>", "" );
                 std::string type_line      = replace_string(
                     item["typeLine"].GetString(), "<<set:MS>><<set:M>><<set:S>>", "" );
-                bool identified            = item["identified"].GetBool();
-                bool corrupted             = item["corrupted"].GetBool();
-                bool locked                = item["lockedToCharacter"].GetBool();
+                bool identified            = item.HasMember("identified") ? item["identified"].GetBool() : false;
+                bool corrupted             = item.HasMember("corrupted") ? item["corrupted"].GetBool() : false;
+                bool locked                = item.HasMember("locked") ? item["locked"].GetBool() : false;
                 std::string note;
                 std::string flavour_text   = "";
                 int frame_type = 0;
@@ -846,10 +846,14 @@ void parse_JSON( const std::string path ) {
                     const rapidjson::Value& mods = item["enchantMods"];
                     enchanted = mods.Size() > 0;
                 }
-                
-                const rapidjson::Value& sockets = item["sockets"];
-                int socket_amount               = sockets.Size();
-                int link_amount                 = get_links_amount( sockets );
+
+                int socket_amount = 0;
+                int link_amount   = 0;
+                if ( item.HasMember( "sockets" )) {
+                    const rapidjson::Value& sockets = item["sockets"];
+                    socket_amount               = sockets.Size();
+                    link_amount                 = get_links_amount( sockets );
+                }
 
                 Item new_item = { w, h, ilvl, icon, league, item_id, 
                                   item_name, type_line, identified, verified, 
@@ -1072,20 +1076,21 @@ void parse_JSON( const std::string path ) {
 
                 int counter = 0;
                 // Parse sockets
-                for ( rapidjson::SizeType k = 0; k < sockets.Size(); k++ ) {
-                    if ( !sockets[k].IsNull()) {
-                        counter++;
-                        assert( sockets[k].IsObject());
-                        const rapidjson::Value& socket = sockets[k];
-                        int         group = socket["group"].GetInt();
-                        assert(socket["attr"].IsString());
-                        std::string attr  = socket["attr"].GetString();
-
-                        Socket parsed_socket = { 
-                            "\"" + item_id + "\"", group, "\"" + attr + "\"",
-                            "\"" + item_id + std::to_string(counter) + "\""
-                        };
-                        parsed_sockets.push_back( parsed_socket );
+                if ( item.HasMember( "sockets" )) {
+                    const rapidjson::Value& sockets = item["sockets"];
+                    for ( rapidjson::SizeType k = 0; k < sockets.Size(); k++ ) {
+                        if ( !sockets[k].IsNull()) {
+                            counter++;
+                            assert( sockets[k].IsObject());
+                            const rapidjson::Value& socket = sockets[k];
+                            int         group = socket["group"].GetInt();
+                            std::string attr  = socket["attr"].IsString() ? socket["attr"].GetString() : std::to_string(socket["attr"].GetBool());
+                            Socket parsed_socket = {
+                                    "\"" + item_id + "\"", group, "\"" + attr + "\"",
+                                    "\"" + item_id + std::to_string(counter) + "\""
+                            };
+                            parsed_sockets.push_back( parsed_socket );
+                        }
                     }
                 }
 
