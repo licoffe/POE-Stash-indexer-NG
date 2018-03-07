@@ -1084,7 +1084,8 @@ void parse_JSON( const std::string path ) {
                             assert( sockets[k].IsObject());
                             const rapidjson::Value& socket = sockets[k];
                             int         group = socket["group"].GetInt();
-                            std::string attr  = socket["attr"].IsString() ? socket["attr"].GetString() : std::to_string(socket["attr"].GetBool());
+                            assert(socket["attr"].IsString() || socket["attr"].IsBool());
+                            std::string attr  = socket["attr"].IsString() ? socket["attr"].GetString() : "F";
                             Socket parsed_socket = {
                                     "\"" + item_id + "\"", group, "\"" + attr + "\"",
                                     "\"" + item_id + std::to_string(counter) + "\""
